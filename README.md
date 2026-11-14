@@ -18,8 +18,8 @@ Learn Go deeply, understand backend engineering fundamentals, and develop the ab
 
 | Phase | Topics | Status |
 |---|---|---|
-| 01 | Go Fundamentals | In Progress |
-| 02 | Concurrency | Planned |
+| 01 | Go Fundamentals | Completed |
+| 02 | Concurrency | In Progress |
 | 03 | Networking | Planned |
 | 04 | HTTP Server Development | Planned |
 | 05 | Backend Architecture | Planned |
