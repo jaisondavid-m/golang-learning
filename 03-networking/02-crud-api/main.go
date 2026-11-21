@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"sync"
 )
 
 type Student struct {
@@ -16,75 +17,78 @@ type Student struct {
 
 var students []Student
 var nextID = 1
+var mu sync.Mutex
 
-func studentHandler(w http.ResponseWriter,r *http.Request) {
+func studentHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		w.Header().Set("Content-Type","application/json")
+		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(students); err != nil {
-			http.Error(w,"Failed to Encode the request",http.StatusBadRequest)
+			http.Error(w, "Failed to Encode the request", http.StatusBadRequest)
 			return
 		}
 	case http.MethodPost:
 		var s Student
 		if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
 			fmt.Println("Decode error:", err)
-			http.Error(w,"Failed to Decode the request",http.StatusBadRequest)
+			http.Error(w, "Failed to Decode the request", http.StatusBadRequest)
 			return
 		}
-		s.ID = nextID 
+		mu.Lock()
+		s.ID = nextID
 		nextID++
 		students = append(students, s)
-		w.Header().Set("Content-Type","application/json")
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		response := map[string]string{"message":"User Created Successfullly"}
+		response := map[string]string{"message": "User Created Successfullly"}
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w,"Failed to Encode the request",http.StatusBadRequest)
+			http.Error(w, "Failed to Encode the request", http.StatusBadRequest)
 			return
 		}
 	case http.MethodDelete:
 		idStr := r.URL.Query().Get("id")
 		if idStr == "" {
-			http.Error(w,"Missing id parameter",http.StatusBadRequest)
+			http.Error(w, "Missing id parameter", http.StatusBadRequest)
 			return
 		}
-		id,err := strconv.Atoi(idStr)
+		id, err := strconv.Atoi(idStr)
 		if err != nil {
 			http.Error(w, "Invalid id format", http.StatusBadRequest)
 			return
 		}
 		oldLen := len(students)
-		students = slices.DeleteFunc(students,func(s Student) bool {
+		students = slices.DeleteFunc(students, func(s Student) bool {
 			return s.ID == id
 		})
 		if oldLen == len(students) {
-			http.Error(w,"Student Not Found",http.StatusNotFound)
+			http.Error(w, "Student Not Found", http.StatusNotFound)
 			return
 		}
-		response := map[string]string{"message":"Student deleted Successfully"}
+		response := map[string]string{"message": "Student deleted Successfully"}
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w,"Failed to encode response",http.StatusBadRequest)
+			http.Error(w, "Failed to encode response", http.StatusBadRequest)
 			return
 		}
 	case http.MethodPut:
 		var s Student
 		idStr := r.URL.Query().Get("id")
 		if idStr == "" {
-			http.Error(w,"Missing id parameter",http.StatusBadRequest)
+			http.Error(w, "Missing id parameter", http.StatusBadRequest)
 			return
 		}
-		id,err := strconv.Atoi(idStr)
+		id, err := strconv.Atoi(idStr)
 		if err != nil {
 			http.Error(w, "Invalid id format", http.StatusBadRequest)
 			return
 		}
 		if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-			http.Error(w,"Failed to decode",http.StatusBadRequest)
+			http.Error(w, "Failed to decode", http.StatusBadRequest)
 			return
 		}
 		found := false
-		for i,student := range students {
+		for i, student := range students {
 			if student.ID == id {
 				found = true
 				students[i].Name = s.Name
@@ -92,29 +96,29 @@ func studentHandler(w http.ResponseWriter,r *http.Request) {
 			}
 		}
 		if !found {
-			http.Error(w,"Student Not Found",http.StatusNotFound)
+			http.Error(w, "Student Not Found", http.StatusNotFound)
 			return
 		}
-		response := map[string]string{"message":"Student Updated Successfully"}
+		response := map[string]string{"message": "Student Updated Successfully"}
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w,"Failed to encode response",http.StatusBadRequest)
+			http.Error(w, "Failed to encode response", http.StatusBadRequest)
 			return
 		}
 	default:
-    	http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-    	return
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
 	}
 }
 
 func main() {
 
-	http.HandleFunc("/students",studentHandler)
+	http.HandleFunc("/students", studentHandler)
 
 	fmt.Println("Server is running on the port: 8000")
 
-	if err := http.ListenAndServe(":8000",nil); err != nil {
-		fmt.Println("Failed to run the server:",err)
+	if err := http.ListenAndServe(":8000", nil); err != nil {
+		fmt.Println("Failed to run the server:", err)
 	}
 
 }
