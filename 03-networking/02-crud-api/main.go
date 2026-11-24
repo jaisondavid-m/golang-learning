@@ -22,9 +22,13 @@ var mu sync.Mutex
 func studentHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		mu.Lock()
+		result := make([]Student,len(students))
+		copy(result,students)
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(students); err != nil {
-			http.Error(w, "Failed to Encode the request", http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(result); err != nil {
+			http.Error(w, "Failed to Encode the request", http.StatusInternalServerError)
 			return
 		}
 	case http.MethodPost:
@@ -43,7 +47,7 @@ func studentHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		response := map[string]string{"message": "User Created Successfullly"}
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, "Failed to Encode the request", http.StatusBadRequest)
+			http.Error(w, "Failed to Encode the request", http.StatusInternalServerError)
 			return
 		}
 	case http.MethodDelete:
@@ -57,18 +61,21 @@ func studentHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid id format", http.StatusBadRequest)
 			return
 		}
+		mu.Lock()
 		oldLen := len(students)
 		students = slices.DeleteFunc(students, func(s Student) bool {
 			return s.ID == id
 		})
-		if oldLen == len(students) {
-			http.Error(w, "Student Not Found", http.StatusNotFound)
+		deleted := oldLen != len(students)
+		mu.Unlock()
+		if !deleted {
+			http.Error(w,"Student Not Found",http.StatusNotFound)
 			return
 		}
 		response := map[string]string{"message": "Student deleted Successfully"}
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusBadRequest)
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 			return
 		}
 	case http.MethodPut:
@@ -88,13 +95,16 @@ func studentHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		found := false
-		for i, student := range students {
-			if student.ID == id {
-				found = true
+		mu.Lock()
+		for i := range students {
+			if students[i].ID == id {
 				students[i].Name = s.Name
 				students[i].Year = s.Year
+				found = true
+				break
 			}
 		}
+		mu.Unlock()
 		if !found {
 			http.Error(w, "Student Not Found", http.StatusNotFound)
 			return
@@ -102,7 +112,7 @@ func studentHandler(w http.ResponseWriter, r *http.Request) {
 		response := map[string]string{"message": "Student Updated Successfully"}
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusBadRequest)
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 			return
 		}
 	default:
